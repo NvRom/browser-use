@@ -97,6 +97,10 @@ class Browser:
 
 		return self.playwright_browser
 
+	async def get_playwright_browser_runtime(self) -> PlaywrightBrowser:
+		"""Get a browser context"""
+		return await self._init()
+
 	@time_execution_async('--init (browser)')
 	async def _init(self):
 		"""Initialize the browser session"""

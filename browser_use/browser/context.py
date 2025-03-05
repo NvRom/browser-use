@@ -127,6 +127,10 @@ class BrowserContextConfig:
 	user_agent: str = (
 		'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36  (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36'
 	)
+	pane_url: str | None = None
+	is_focus_on_pane: bool = False
+	is_pane_rendered: bool = False
+	should_lauch_persistent: bool = False
 
 	highlight_elements: bool = True
 	viewport_expansion: int = 500
@@ -302,10 +306,39 @@ class BrowserContext:
 			return await self._initialize_session()
 		return self.session
 
+	async def get_runtime_session(self) -> BrowserSession:
+		"""Lazy initialization of the browser and related components"""
+		if self.session is None:
+			return await self._initialize_session()
+		self.playwright_browser = await self.browser.get_playwright_browser_runtime()
+		self.session.context = await self._create_context(self.playwright_browser)
+		self._add_new_page_listener(self.session.context)
+		return self.session
+	
 	async def get_current_page(self) -> Page:
 		"""Get the current page"""
 		session = await self.get_session()
+		if self.config.is_focus_on_pane == False:
+			return await self._get_current_page(session)
+		else:
+			return await self.get_ec_page()
+	
+	async def get_ec_page(self) -> Page:
+		"""Get the ec page"""
+		if self.config.is_pane_rendered == False:
+			session = await self.get_runtime_session()
+		else:
+			session = await self.get_session()
+		for page in session.context.pages:
+			if self.config.pane_url != None and self.config.pane_url in page.url:
+				self.config.is_pane_rendered = True
+				return page
 		return await self._get_current_page(session)
+	
+	def switch_checkout_page(self) -> bool:
+		"""Switch to the checkout page"""
+		self.config.is_focus_on_pane = False
+		return True
 
 	async def _create_context(self, browser: PlaywrightBrowser):
 		"""Creates a new browser context with anti-detection measures and loads cookies if available."""
@@ -313,7 +346,15 @@ class BrowserContext:
 			context = browser.contexts[0]
 		elif self.browser.config.chrome_instance_path and len(browser.contexts) > 0:
 			# Connect to existing Chrome instance instead of creating new one
-			context = browser.contexts[0]
+			if self.config.should_lauch_persistent:
+				context = await browser.browser_type.launch_persistent_context(
+					user_data_dir="C:\\Users\\weixche\\AppData\\Local\\Microsoft\\Edge SxS\\User Data\\Profile 1",
+					channel="msedge-canary",
+					record_video_dir=self.config.save_recording_path,
+				)
+			else:
+				context = browser.contexts[0]
+			browser.contexts[0] = context
 		else:
 			# Original code for creating new context
 			context = await browser.new_context(
@@ -328,6 +369,7 @@ class BrowserContext:
 				locale=self.config.locale,
 			)
 
+		# context.record_video_dir=self.config.save_recording_path
 		if self.config.trace_path:
 			await context.tracing.start(screenshots=True, snapshots=True, sources=True)
 
@@ -966,7 +1008,7 @@ class BrowserContext:
 				'readonly',
 				# Media attributes
 				'alt',
-				'title',
+				# 'title',
 				'src',
 				# Custom stable attributes (add any application-specific ones)
 				'href',
@@ -984,6 +1026,7 @@ class BrowserContext:
 
 			# Handle other attributes
 			for attribute, value in element.attributes.items():
+				# logger.info(f'Attribute: {attribute}, Value: {value}')
 				if attribute == 'class':
 					continue
 
@@ -1142,7 +1185,7 @@ class BrowserContext:
 					await self._check_and_handle_navigation(page)
 
 			try:
-				return await perform_click(lambda: element_handle.click(timeout=1500))
+				return await perform_click(lambda: element_handle.click(timeout=1500,force=True))
 			except URLNotAllowedError as e:
 				raise e
 			except Exception:

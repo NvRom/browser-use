@@ -188,3 +188,10 @@ gcp-login.json
 *.jsonl
 
 uv.lock
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
