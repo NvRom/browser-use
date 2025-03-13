@@ -334,11 +334,6 @@ class BrowserContext:
 				self.config.is_pane_rendered = True
 				return page
 		return await self._get_current_page(session)
-	
-	def switch_checkout_page(self) -> bool:
-		"""Switch to the checkout page"""
-		self.config.is_focus_on_pane = False
-		return True
 
 	async def _create_context(self, browser: PlaywrightBrowser):
 		"""Creates a new browser context with anti-detection measures and loads cookies if available."""

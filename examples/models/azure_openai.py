@@ -6,6 +6,7 @@ Simple try of the agent.
 
 import os
 import sys
+import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -86,133 +87,6 @@ async def refresh_page(browser: BrowserContext):
 # https://www.alexandani.com/checkouts/cn/Z2NwLXVzLWVhc3QxOjAxSktaNThXNzFLUUdYN1dHTVdES0tGRTlF/payment
 # goal: test if EC(Express Checkout) could overwrite fields which are already filled by the user
 
-overwrite_task = """
-You are a professional tester. 
-You should do the following steps in order, and then validate the result in the end.
-steps:
-1. go to https://www.alexandani.com/checkouts/cn/Z2NwLXVzLWVhc3QxOjAxSktaNThXNzFLUUdYN1dHTVdES0tGRTlF/payment
-2. refresh the page
-3. fill few fields in the checkout page with below value:
-    - First name: browser use
-    - Last name: test
-4. switch to side pane and wait pane to appear
-5. find `precessed and review` button and click it
-6. wait 'continue to checkout' button to be visible
-validate:
-1. switch to checkout page
-2. value of below fields' should be:
-    - First name: browser use
-    - Last name: test
-3. if above expectations are not met, please output 'overwrite tests failed'; else output 'overwrite tests passed'
-"""
-
-auto_dismiss_task = """
-You are a professional tester. 
-I'll provide you a detailed test steps, each step includes action and validation part.
-You should execute action part at first, then validation part. Only pass the validation part, you can move to the next step.
-If no value in validation part, just move next step.
-
-step 1:{
-action: go to https://nordcheckout.com/payment/?product_group=nordvpn&ff%5Bplan-period-dropdown%5D=on&cart_id=0bbd686e-0c38-469b-b869-7fddb0d47434&product_xs=dedicated_ip,
-validation: 
-},
-step 2:{
-action: refresh the page,
-validation: 
-},
-step 3:{
-action: find `Credit or debit card` label and click it,
-validation: if first name field found, go to next step; else retry step 3, the maxium retry times is 5. if retry times is over, output 'step 3 failed' and stop the test,
-}
-step 4:{
-action: switch to side pane and wait pane to appear, 
-validation: if 'Proceed and review' button found, go to next step; else retry step 4, the maxium retry times is 5. if retry times is over, output 'step 4 failed' and stop the test,
-}
-step 5:{
-action: switch to checkout page,
-validation:
-}
-step 6:{
-action: find 'Paypal' label and click it,
-validation: if 'buy with' button found, go to next step; else retry step 6, the maxium retry times is 5. if retry times is over, output 'step 6 failed' and stop the test,
-}
-step 7:{
-action: switch to side pane,
-validation: if `Autofill checkout details` words is not found, output 'auto dismiss test passed'; else output 'auto dismiss test failed'
-}
-"""
-
-auto_dismiss_task_fill_form = """
-You are a professional tester. 
-I'll provide you a detailed test steps, each step includes action and validation part.
-You should execute action part at first, then validation part. Only pass the validation part, you can move to the next step.
-If no value in validation part, just move next step.
-
-step 1:{
-action: go to https://nordcheckout.com/payment/?product_group=nordvpn&ff%5Bplan-period-dropdown%5D=on&cart_id=0bbd686e-0c38-469b-b869-7fddb0d47434&product_xs=dedicated_ip,
-validation: 
-},
-step 2:{
-action: refresh the page,
-validation: 
-},
-step 3:{
-action: find `Credit or debit card` label and click it,
-validation: if first name field found, go to next step; else retry step 3, the maxium retry times is 5. if retry times is over, output 'step 3 failed' and stop the test,
-}
-step 4:{
-action: switch to side pane and wait pane to appear, 
-validation: if 'Proceed and review' button found, go to next step; else retry step 4, the maxium retry times is 5. if retry times is over, output 'step 4 failed' and stop the test,
-}
-step 5:{
-action: switch to checkout page,
-validation:
-}
-step 6:{
-action: fill the fields in the checkout page with below value:
-    - Card number: 4111 1111 1111 1111,
-    - Expiration date: 12/25,
-    - CVC: 123,
-validation: if value in 'Card number' is equal to '4111 1111 1111 1111', go to next step; else retry step 6, the maxium retry times is 5. if retry times is over, output 'step 4 failed' and stop the test,
-}
-step 7:{
-action: switch to side pane,
-validation: if `Autofill checkout details` words is not found, output 'auto dismiss test passed'; else output 'auto dismiss test failed'
-}
-"""
-
-coupon_apply_task = """
-You are a professional tester. 
-I'll provide you a detailed test steps, each step includes action and validation part.
-You should execute action part at first, then validation part. Only pass the validation part, you can move to the next step.
-If no value in validation part, just move next step.
-
-step 1:{
-action: go to https://www.fashionnova.com/checkouts/cn/Z2NwLXVzLWVhc3QxOjAxSk5GSFFZUEFRRUQzQTFXRDBXV0ZKRDVR,
-validation: 
-},
-step 2:{
-action: refresh the page,
-validation: 
-},
-step 3:{
-action: switch to side pane and wait pane to appear, 
-validation: if `apply savings` words found, go to next step; else retry step 4, the maxium retry times is 5. if retry times is over, output 'step 4 failed' and stop the test,
-}
-step 4:{
-action: select `apply savings` checkout box
-validation:
-}
-step 5:{
-action: find 'Proceed and review' button and click it
-validation:
-}
-step 6:{
-action: find 'continue to checkout' button。 important: do not click any button, just find it
-validation: if button found, complete the task. else retry step 7 in 5 seconds, the maxium retry times is 5. if retry times is over, output 'step 7 failed' and stop the test,
-}
-"""
-
 # json format
 sample_task_json = """
 You are a professional tester. 
@@ -233,30 +107,45 @@ If the last step failed at expected_result, output 'test failed'; else output 't
       "test_case_description": "...",
       "steps": [
         {
-          "step_name": "1",
-          "step_description": "go to https://lobsteranywhere.com/checkout/",
+          "step_name": go to checkout page,",
+          "step_description": "go to https://www.fashionnova.com/checkouts/cn/Z2NwLXVzLWVhc3QxOjAxSk5GSFFZUEFRRUQzQTFXRDBXV0ZKRDVR",
           "expected_result": ""
         },
         {
-          "step_name": "2",
+          "step_name": "refresh page",
           "step_description": "refresh the page",
           "expected_result": ""
         },
         {
-          "step_name": "3",
+          "step_name": "fill fields(card number)",
+          "step_description": "Fill fields with below value: card number: 4111 1111 1111 1111",
+          "expected_result": ""
+        },
+        {
+          "step_name": "switch pane with autofill enabled",
           "step_description": "switch to side pane and wait pane to appear",
           "expected_result": "'Autofill checkout details' words should be found"
         },
         {
-          "step_name": "4",
+          "step_name": "click CTA button (Autofill only)",
           "step_description": "find 'Proceed and review' button and click it",
           "expected_result": "'Cancel' button should be visible"
         },
         {
-          "step_name": "5",
+          "step_name": "EC pane summary page validation (Autofill only)",
           "step_description": "find 'continue to checkout' button。 important: do not click any button, just find it",
           "expected_result": "'continue to checkout' button should be found"
-        }
+        },
+        {
+          "step_name": "switch checkout page",
+          "step_description": "switch to checkout page",
+          "expected_result": "'card number' fields should be found"
+        },
+        {
+          "step_name": "validation",
+          "step_description": "get the value of 'card number' field",
+          "expected_result": "if value is equal to '4111 1111 1111 1111', output 'test passed', otherwise output 'test failed'"
+        },
       ]
     }
   ]
@@ -298,7 +187,7 @@ If the last step failed at expected_result, output 'test failed'; else output 't
         },
         {
           "step_name": "4",
-          "step_description": "select `apply savings` checkout box",
+          "step_description": "find `Apply savings` checkbox, and check it",
           "expected_result": 
         },
         {
@@ -308,13 +197,13 @@ If the last step failed at expected_result, output 'test failed'; else output 't
         },
         {
           "step_name": "6",
-          "step_description": "wait for 60 seconds. important: do not click any button, just wait",
+          "step_description": "wait for 30 seconds. important: do not click any button, just wait",
           "expected_result": 
         }
         {
-          "step_name": "7",
+          "step_name": "validation",
           "step_description": "find 'continue to checkout' button。 important: do not click any button, just find it",
-          "expected_result": "'Your checkout details were filled in' should be found"
+          "expected_result": "If'Your checkout details were filled in' found, output 'test passed'; else if 'The autofill couldn't complete all your details' output 'test failed'; else output 'test passed'"
         }
       ]
     }
@@ -371,10 +260,9 @@ If the last step failed at expected_result, output 'test failed'; else output 't
 }
 """
 
-
 agent = Agent(
-    # task= "go to https://environmentamerica.org/take-action/donate-today/?amount=50&recurring=no",
-    task = coupon_apply_task_json,
+    task= task,
+    # task = coupon_apply_task_json,
     llm=llm,
     browser=browser,
     # browser_context=context,
@@ -382,9 +270,54 @@ agent = Agent(
     use_vision_for_planner=False,
 )
 
+async def run_test_with_task(llm, task: str):
+    browser = Browser(
+        config=BrowserConfig(
+            # NOTE: you need to close your chrome browser - so that this can open your browser in debug mode
+            chrome_instance_path='C:\\Users\\weixche\\AppData\\Local\\Microsoft\\Edge SxS\\Application\\msedge.exe',
+            extra_chromium_args=['--profile-directory=Profile 1'] + ['--user-data-dir=C:\\Users\\weixche\\AppData\\Local\\Microsoft\\Edge SxS\\User Data\\', '--enable-features=msWalletCheckoutDebugDAF'],
+            new_context_config=BrowserContextConfig(
+                # save_recording_path='./tmp/recordings',
+                # should_lauch_persistent= True,
+                pane_url='edge://wallet-drawer/',
+            )   
+        )
+    )
+    agent = Agent(
+        task=task,
+        llm=llm,
+        browser=browser,
+        controller=controller,
+    )
+    return await agent.run(max_steps=10)
+
+async def run_single_test(llm, task: str, url: str):
+    browser = Browser(
+	    config=BrowserConfig(
+		    # NOTE: you need to close your chrome browser - so that this can open your browser in debug mode
+		    chrome_instance_path='C:\\Users\\weixche\\AppData\\Local\\Microsoft\\Edge SxS\\Application\\msedge.exe',
+            extra_chromium_args=['--profile-directory=Profile 1'] + ['--user-data-dir=C:\\Users\\weixche\\AppData\\Local\\Microsoft\\Edge SxS\\User Data\\', '--enable-features=msWalletCheckoutDebugDAF'],
+            new_context_config=BrowserContextConfig(
+                # save_recording_path='./tmp/recordings',
+                # should_lauch_persistent= True,
+                pane_url='edge://wallet-drawer/',
+            )   
+	    )
+    )
+    new_task = task.replace('PLACEHOLDER', url)
+    agent = Agent(
+		task=new_task,
+		llm=llm,
+		browser=browser,
+		# sensitive_data=sensitive_data,
+		use_vision=False, # avoid too many data in log
+		controller=controller,
+	)
+
+    return await agent.run(max_steps=5)
+
+
 async def main():
     await agent.run(max_steps=15)
-    input('Press Enter to continue...')
-
 
 asyncio.run(main())
