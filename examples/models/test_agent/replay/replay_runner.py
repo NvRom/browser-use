@@ -143,7 +143,7 @@ async def _replay_test_steps(
 					replayStep.print()
 					print(f'✚✚✚✚✚')
 					replayAction.print()
-					input(f'‼️‼️‼️‼️ try to recover now, press Enter to continue...')
+					# input(f'‼️‼️‼️‼️ try to recover now, press Enter to continue...')
 					successOrNot = await _recover_step_using_agent(
 						llm,
 						controller=controller,
@@ -155,14 +155,14 @@ async def _replay_test_steps(
 						action_name=action_name,
 						action_model=action_model,
 					)
-					input(f'‼️‼️‼️‼️ recover done, success: {successOrNot}, press Enter to continue...')
+					# input(f'‼️‼️‼️‼️ recover done, success: {successOrNot}, press Enter to continue...')
 					if not successOrNot:
 						raise e
 
 
 #
 # replay the test case
-async def replay_test(llm, test_case: TestCase):
+async def replay_test(llm, test_case: TestCase, domain: str):
 	# Placeholder for additional logic if needed
 	if not test_case.replay_steps:
 		raise ValueError("no replay steps found in test case")
@@ -185,16 +185,18 @@ async def replay_test(llm, test_case: TestCase):
 
 	# start browser
 	await browser_context.get_session()
-
-	print("=================ready to run...")
-	await _replay_test_steps(
-		llm, test_case.replay_steps if test_case.replay_steps is not None else [],
-		controller=controller,
-		browser_context=browser_context,
-		browser=browser,
-	)
-	# validation the final result
-	return await _validate_replay_result(llm, test_case, controller, browser_context)
+	try:
+		print("=================ready to run...")
+		await _replay_test_steps(
+			llm, test_case.replay_steps if test_case.replay_steps is not None else [],
+			controller=controller,
+			browser_context=browser_context,
+			browser=browser,
+		)
+		# validation the final result
+		return await _validate_replay_result(llm, test_case, controller, browser_context)
+	finally:
+		await browser_context.close_tab_with_domain(domain)
 
 
 #

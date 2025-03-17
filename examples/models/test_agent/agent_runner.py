@@ -23,7 +23,7 @@ def _init_browser():
 	)
 	return browser
 
-async def run_agent(llm,task: str):
+async def run_agent(llm,task: str,domain:str):
 	browser = Browser(
 		config=BrowserConfig(
 			# NOTE: you need to close your chrome browser - so that this can open your browser in debug mode
@@ -62,17 +62,20 @@ async def run_agent(llm,task: str):
 		return ActionResult(extracted_content=msg, include_in_memory=False)
 	# register_custom_actions(controller)
 
-	agent = Agent(
-		task=task,
-		llm=llm,
-		max_actions_per_step=4,
-		browser=browser,
-		controller=controller,
-	)
+	try:
+		agent = Agent(
+			task=task,
+			llm=llm,
+			max_actions_per_step=4,
+			browser=browser,
+			controller=controller,
+		)
+		historyList = await agent.run(max_steps=10)
 
-	historyList = await agent.run(max_steps=10)
+		replaySteps = get_test_replay_steps(historyList)
+		return replaySteps
+	finally:
+		await agent.close_tab_with_domain(domain)
 
-	replaySteps = get_test_replay_steps(historyList)
-	return replaySteps
 
 	

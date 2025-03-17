@@ -633,8 +633,8 @@ class Agent(Generic[Context]):
 				)
 			)
 
-			if not self.injected_browser_context:
-				await self.browser_context.close()
+			# if not self.injected_browser_context:
+			# 	await self.browser_context.close()
 
 			if not self.injected_browser and self.browser:
 				await self.browser.close()
@@ -962,3 +962,9 @@ class Agent(Generic[Context]):
 	@property
 	def message_manager(self) -> MessageManager:
 		return self._message_manager
+
+# ec test start
+	async def close_tab_with_domain(self, domain:str) -> None:
+		"""Close the current tab"""
+		await self.browser_context.close_tab_with_domain(domain)
+# ec test end

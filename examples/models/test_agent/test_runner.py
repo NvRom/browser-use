@@ -28,15 +28,28 @@ system_prompt = """
 You are a professional tester. 
 I'll provide you a json input, you should execute the step in order under steps key.
 Each step includes step_name, step_description and expected_result:
-    - step_name: placeholder
-    - step_description: actionable step
-    - expected_result: the expected result after executing the step
-You should execute step_description at first, then check if the expected_result is met condition. 
-If the expected_result is met, you can move to the next step. else retry the current step, the maxium retry times is 3. if retry times is over, output 'step failed' and stop the test.
-If no value in expected_result, just move next step.
-Close any pop-up windows when opening an app.
-all input is clear, do not add any extra information.
-If the last step failed at expected_result, output 'test failed'; else output 'test passed'.
+'''
+{
+    "step_name": "",
+    "step_description": "",
+    "expected_result": ""
+}
+- step_name: the name of the step, you can ignore it
+- step_description: the description of the step, you need to execute it.
+- expected_result: the expected result of the step, you need to check if the step is successful.
+example:
+{
+    "step_name": "Summary page validation (Autofill)",
+    "step_description": "extract the page to find words 'Your checkout details were filled in'. important: do not click any button, just find it",
+    "expected_result": "if 'Your checkout details were filled in' is found, complete the task with success. else, fail the task"
+}
+in this example, you need to extract the page and find the words 'Your checkout details were filled in'. 
+If the words were found, complete the task with success, else, fail the task.
+'''
+- You should execute step_description at first, then check if the expected_result is met condition. 
+- If no value present in expected_result, just move next step.
+- If the expected_result is met, you can move to the next step. else retry the current step, the maxium retry times is 3. if retry times is over, output 'step failed' and stop the test.
+
 """
 
 
@@ -51,7 +64,7 @@ def _init_llm():
 	azure_openai_endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT')
 	azure_openai_api_key = os.environ.get('OPENAI_API_KEY')
 	llm = AzureChatOpenAI(
-    	model_name='gpt-4o-mini',  # type: ignore
+    	model_name='gpt-4o',  # type: ignore
     	openai_api_key=azure_openai_api_key, # type: ignore
     	# azure_ad_token_provider=token_provider,
     	azure_endpoint=azure_openai_endpoint,  # Corrected to use azure_endpoint instead of openai_api_base
@@ -60,29 +73,30 @@ def _init_llm():
 	)
 	return llm
 
-async def run_test(llm,test:TestCase):
+async def run_test(llm,test:TestCase, domain:str):
     # run task with agent or replay
     if not test.replay_steps:
         # run task with agent
-        replay_steps = await run_agent(llm,system_prompt + json.dumps(test.steps, cls=TestStepEncoder))
+        replay_steps = await run_agent(llm,system_prompt + json.dumps(test.steps, cls=TestStepEncoder), domain)
         is_replay = False
         return (is_replay, replay_steps)
     else:
         # replay
-        await replay_test(llm,test)
+        await replay_test(llm,test,domain)
         return (True, None)
 
 # run test without filter
 async def main(filter: Optional[dict[str,Any]] = None):
     llm = _init_llm()
-    for json_file in Path(os.path.dirname(os.path.abspath(__file__))).glob('**/fashionnova.test_copy.json'):
+    for json_file in Path(os.path.dirname(os.path.abspath(__file__))).glob('**/fashionnova.test.json'):
         file_path = json_file.resolve()
         need_save_to_file = False
         with open(file_path, 'r') as f:
             # json_str = json.loads(f.read())
             test_cases = ECTest.model_validate_json(f.read())
             for test_case in test_cases.test_cases:
-                (is_replay, replay_steps) = await run_test(llm,test_case)
+                domain = test_cases.domain if test_cases.domain else ""
+                (is_replay, replay_steps) = await run_test(llm, test_case, domain)
                 if not is_replay and replay_steps:
                     test_case.replay_steps = replay_steps
                     need_save_to_file = True

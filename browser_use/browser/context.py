@@ -130,7 +130,6 @@ class BrowserContextConfig:
 	pane_url: str | None = None
 	is_focus_on_pane: bool = False
 	is_pane_rendered: bool = False
-	should_lauch_persistent: bool = False
 
 	highlight_elements: bool = True
 	viewport_expansion: int = 500
@@ -305,15 +304,6 @@ class BrowserContext:
 		if self.session is None:
 			return await self._initialize_session()
 		return self.session
-
-	async def get_runtime_session(self) -> BrowserSession:
-		"""Lazy initialization of the browser and related components"""
-		if self.session is None:
-			return await self._initialize_session()
-		self.playwright_browser = await self.browser.get_playwright_browser_runtime()
-		self.session.context = await self._create_context(self.playwright_browser)
-		self._add_new_page_listener(self.session.context)
-		return self.session
 	
 	async def get_current_page(self) -> Page:
 		"""Get the current page"""
@@ -322,6 +312,16 @@ class BrowserContext:
 			return await self._get_current_page(session)
 		else:
 			return await self.get_ec_page()
+	
+# ec test start
+	async def get_runtime_session(self) -> BrowserSession:
+		"""Lazy initialization of the browser and related components"""
+		if self.session is None:
+			return await self._initialize_session()
+		self.playwright_browser = await self.browser.get_playwright_browser_runtime()
+		self.session.context = await self._create_context(self.playwright_browser)
+		self._add_new_page_listener(self.session.context)
+		return self.session
 	
 	async def get_ec_page(self) -> Page:
 		"""Get the ec page"""
@@ -334,22 +334,26 @@ class BrowserContext:
 				self.config.is_pane_rendered = True
 				return page
 		return await self._get_current_page(session)
+	
+	async def close_tab_with_domain(self, domain: str):
+		"""close tab with domain"""
+		session = await self.get_session()
+		pages = session.context.pages
+		for page in pages:
+			if page.url and domain in page.url:
+				await page.close()
+
+		# Switch to the first available tab if any exist
+		if session.context.pages:
+			await self.switch_to_tab(0)
+# ec test end
 
 	async def _create_context(self, browser: PlaywrightBrowser):
 		"""Creates a new browser context with anti-detection measures and loads cookies if available."""
 		if self.browser.config.cdp_url and len(browser.contexts) > 0:
 			context = browser.contexts[0]
 		elif self.browser.config.chrome_instance_path and len(browser.contexts) > 0:
-			# Connect to existing Chrome instance instead of creating new one
-			if self.config.should_lauch_persistent:
-				context = await browser.browser_type.launch_persistent_context(
-					user_data_dir="C:\\Users\\weixche\\AppData\\Local\\Microsoft\\Edge SxS\\User Data\\Profile 1",
-					channel="msedge-canary",
-					record_video_dir=self.config.save_recording_path,
-				)
-			else:
-				context = browser.contexts[0]
-			browser.contexts[0] = context
+			context = browser.contexts[0]
 		else:
 			# Original code for creating new context
 			context = await browser.new_context(
